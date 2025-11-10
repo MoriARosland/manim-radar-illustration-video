@@ -63,3 +63,31 @@ class RadarSpectrum(Scene):
         self.wait(1)
         self.play(FadeOut(chirp_graph), FadeOut(frequency_line), FadeOut(label_group) , FadeOut(radiowave), run_time=0.7)
         self.wait(1)
+
+class AntennaEcho(Scene):
+    def construct(self):
+        # Create the vertical rod (antenna mast)
+        rod_height = 1
+        rod = Line(ORIGIN, UP * rod_height, color=WHITE, stroke_width=8)
+
+        # Create the hollow circle at the top
+        circle_radius = 0.2
+        circle = Circle(radius=circle_radius, color=WHITE, stroke_width=8, fill_opacity=0)
+        circle.move_to(rod.get_end() + UP * circle_radius)
+
+        # Group the antenna components
+        antenna = VGroup(rod, circle)
+
+        # Animate the antenna drawing
+        self.play(Create(rod), run_time=1)
+        self.play(Create(circle), run_time=0.5)
+        self.wait(1)
+
+class PlaneRadar(Scene):
+    def construct(self):
+        plane_img = ImageMobject("plane.png")
+        plane_img.scale(0.5)
+        plane_img.move_to(ORIGIN)
+
+        self.add(plane_img)
+        self.wait(1)
