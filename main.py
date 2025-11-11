@@ -64,30 +64,112 @@ class RadarSpectrum(Scene):
         self.play(FadeOut(chirp_graph), FadeOut(frequency_line), FadeOut(label_group) , FadeOut(radiowave), run_time=0.7)
         self.wait(1)
 
-class AntennaEcho(Scene):
+
+class PlaneRadar(Scene):
     def construct(self):
         # Create the vertical rod (antenna mast)
         rod_height = 1
         rod = Line(ORIGIN, UP * rod_height, color=WHITE, stroke_width=8)
 
-        # Create the hollow circle at the top
+        # Create the hollow circle at the top of the antenna mast
         circle_radius = 0.2
         circle = Circle(radius=circle_radius, color=WHITE, stroke_width=8, fill_opacity=0)
         circle.move_to(rod.get_end() + UP * circle_radius)
 
-        # Group the antenna components
         antenna = VGroup(rod, circle)
+        antenna.move_to(LEFT * 5)
 
-        # Animate the antenna drawing
-        self.play(Create(rod), run_time=1)
-        self.play(Create(circle), run_time=0.5)
-        self.wait(1)
-
-class PlaneRadar(Scene):
-    def construct(self):
         plane_img = ImageMobject("plane.png")
         plane_img.scale(0.5)
-        plane_img.move_to(ORIGIN)
+        plane_img.move_to(RIGHT * 5)
 
-        self.add(plane_img)
+        self.play(
+            Create(rod),
+            FadeIn(plane_img),
+            run_time=1
+        )
+        self.play(Create(circle), run_time=0.4)
+
+        # Create a propagating sine wave that moves toward the plane
+        wave_freq = 7  
+        wave_length = 3 * (2 * np.pi / wave_freq)  # 3 periods
+
+        leading_edge = ValueTracker(-1)  
+        trailing_edge = ValueTracker(-1 - wave_length)  
+        wave_opacity = ValueTracker(0) 
+
+        def create_propagating_wave():
+            lead = leading_edge.get_value()
+            trail = trailing_edge.get_value()
+
+            if lead > trail:
+                wave = FunctionGraph(
+                    lambda x: np.sin(wave_freq * x), 
+                    x_range=[trail, lead, 0.01],
+                    color=BLUE,
+                    stroke_width=3,
+                    fill_opacity=0
+                )
+                wave.set_stroke(opacity=wave_opacity.get_value())
+                return wave
+            else:
+                # Return empty group if no wave to show
+                return VGroup()
+
+        propagating_wave = always_redraw(create_propagating_wave)
+
+        self.add(propagating_wave)
+
+        final_position = 4  
+
+        self.play(
+            leading_edge.animate.set_value(final_position),
+            trailing_edge.animate.set_value(final_position - wave_length),
+            wave_opacity.animate.set_value(1).set_rate_func(rate_functions.ease_out_expo),
+            run_time=1.5,
+            rate_func=rate_functions.linear
+        )
+
+        self.remove(propagating_wave) 
+
+        echo_leading = ValueTracker(4)  
+        echo_trailing = ValueTracker(4 - wave_length)  
+        echo_opacity = ValueTracker(1)  
+
+        def create_echo_wave():
+            lead = echo_leading.get_value()
+            trail = echo_trailing.get_value()
+
+            if lead > trail:
+                wave = FunctionGraph(
+                    lambda x: np.sin(wave_freq * x),  
+                    x_range=[trail, lead, 0.01],
+                    color=RED,  
+                    stroke_width=3,
+                    fill_opacity=0  
+                )
+                wave.set_stroke(opacity=echo_opacity.get_value())
+                return wave
+            else:
+                return VGroup()
+
+        echo_wave = always_redraw(create_echo_wave)
+        self.add(echo_wave)
+
+        self.play(
+            echo_leading.animate.set_value(-1.8),  
+            echo_trailing.animate.set_value(-1.8 - wave_length),  
+            run_time=2,
+            rate_func=rate_functions.ease_out_sine
+        )
+
+        self.wait(1)
+
+        self.play(
+            FadeOut(antenna),
+            FadeOut(plane_img),
+            FadeOut(echo_wave),
+            run_time=1.5
+        )
+
         self.wait(1)
