@@ -1,3 +1,4 @@
+from click.core import V
 from manim import *
 import numpy as np
 
@@ -173,3 +174,166 @@ class PlaneRadar(Scene):
         )
 
         self.wait(1)
+
+class SimpleRangeCalculation(Scene):
+    def construct(self):
+        eq = MathTex(
+            r"R = c \times \frac{t}{2}",
+        )
+        eq.move_to(ORIGIN)
+
+        self.play(Write(eq))
+        self.wait(0.5)
+
+        self.play(eq[0][0].animate.set_color(RED), run_time=0.2)
+        self.wait(0.5)
+        self.play(eq[0][0].animate.set_color(WHITE), run_time=0.2)
+        self.wait(0.3)
+        self.play(eq[0][2].animate.set_color(RED), run_time=0.2)
+        self.wait(0.5)
+        self.play(eq[0][2].animate.set_color(WHITE), run_time=0.2)
+        self.wait(0.3)
+        self.play(eq[0][4].animate.set_color(RED), run_time=0.2)
+        self.wait(0.6)
+        self.play(eq[0][4].animate.set_color(WHITE), run_time=0.2)
+        self.wait(2)
+
+        # Fade in plane radar scene elements
+        # Create the vertical rod (antenna mast)
+        rod_height = 1
+        rod = Line(ORIGIN, UP * rod_height, color=WHITE, stroke_width=8)
+
+        # Create the hollow circle at the top of the antenna mast
+        circle_radius = 0.2
+        circle = Circle(radius=circle_radius, color=WHITE, stroke_width=8, fill_opacity=0)
+        circle.move_to(rod.get_end() + UP * circle_radius)
+
+        antenna = VGroup(rod, circle)
+        antenna.move_to(LEFT * 5 + DOWN * 2)  # Position below the equation
+
+        plane_img = ImageMobject("plane.png")
+        plane_img.scale(0.5)
+        plane_img.move_to(RIGHT * 5 + DOWN * 2)  # Position below the equation
+
+        # Shift up equation and fade in antenna and plane together
+        self.play(
+            eq.animate.shift(UP * 2),
+            FadeIn(antenna),
+            FadeIn(plane_img),
+            run_time=1.5
+        )
+
+        # Create time counter
+        time_tracker = ValueTracker(0)
+
+        def create_time_display():
+            current_time = time_tracker.get_value()
+            time_text = f"{current_time:.0f} µs"
+            display = Text(time_text, font_size=36, color=YELLOW)
+            display.move_to(RIGHT * 4 + UP * 1.5)  # Position in top-right area
+            return display
+
+        time_display = always_redraw(create_time_display)
+        self.add(time_display)
+
+        # Create a propagating sine wave that moves toward the plane
+        wave_freq = 7
+        wave_length = 3 * (2 * np.pi / wave_freq)  # 3 periods
+
+        leading_edge = ValueTracker(-1)
+        trailing_edge = ValueTracker(-1 - wave_length)
+        wave_opacity = ValueTracker(0)
+
+        def create_propagating_wave():
+            lead = leading_edge.get_value()
+            trail = trailing_edge.get_value()
+
+            if lead > trail:
+                wave = FunctionGraph(
+                    lambda x: np.sin(wave_freq * x),
+                    x_range=[trail, lead, 0.01],
+                    color=BLUE,
+                    stroke_width=3,
+                    fill_opacity=0
+                )
+                wave.set_stroke(opacity=wave_opacity.get_value())
+                wave.shift(DOWN * 2)  # Position below the equation
+                return wave
+            else:
+                # Return empty group if no wave to show
+                return VGroup()
+
+        propagating_wave = always_redraw(create_propagating_wave)
+
+        self.add(propagating_wave)
+
+        final_position = 4
+
+        self.play(
+            leading_edge.animate.set_value(final_position),
+            trailing_edge.animate.set_value(final_position - wave_length),
+            wave_opacity.animate.set_value(1).set_rate_func(rate_functions.ease_out_expo),
+            time_tracker.animate.set_value(142.67),  # 1.5s / 3.5s * 333 ≈ 142.67
+            run_time=1.5,
+            rate_func=rate_functions.linear
+        )
+
+        self.remove(propagating_wave)
+
+        # Create the echo wave
+        echo_leading = ValueTracker(4)
+        echo_trailing = ValueTracker(4 - wave_length)
+        echo_opacity = ValueTracker(1)
+
+        def create_echo_wave():
+            lead = echo_leading.get_value()
+            trail = echo_trailing.get_value()
+
+            if lead > trail:
+                wave = FunctionGraph(
+                    lambda x: np.sin(wave_freq * x),
+                    x_range=[trail, lead, 0.01],
+                    color=RED,
+                    stroke_width=3,
+                    fill_opacity=0
+                )
+                wave.set_stroke(opacity=echo_opacity.get_value())
+                wave.shift(DOWN * 2)  # Position below the equation
+                return wave
+            else:
+                return VGroup()
+
+        echo_wave = always_redraw(create_echo_wave)
+        self.add(echo_wave)
+
+        self.play(
+            echo_leading.animate.set_value(-1.8),
+            echo_trailing.animate.set_value(-1.8 - wave_length),
+            time_tracker.animate.set_value(333),
+            run_time=2,
+            rate_func=rate_functions.ease_out_sine
+        )
+
+        self.wait(1)
+
+        self.play(eq.animate.move_to(ORIGIN),
+                  FadeOut(antenna),
+                  FadeOut(plane_img),
+                  FadeOut(echo_wave),
+                  FadeOut(time_display),
+                  run_time=0.5)
+
+        eq2 = MathTex(
+            r"R &= c \times \frac{t}{2}\\ &=3 \times 10^8 \times \frac{333 \mu s}{2}\\ &=50 \text{km}",
+        )
+        self.play(Transform(eq, eq2))
+        self.wait(1)
+
+        eq3 = MathTex(
+            r"R = \sqrt[4]{ \frac{P_t G^2 \sigma_{rcs} }{ (4 \pi)^2 P_r} }"
+        )
+
+        self.play(Transform(eq, eq3))
+        self.wait(1)
+        self.play(Unwrite(eq), run_time=0.8)
+        self.wait(0.5)
